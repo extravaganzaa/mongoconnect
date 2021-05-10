@@ -52,13 +52,13 @@ func (ms *MongoSession) InsertOne(ctx context.Context, payload string, collectio
 	var bdoc interface{}
 	err := bson.UnmarshalExtJSON([]byte(payload), true, &bdoc)
 	if err != nil {
-		fmt.Println("error while bson Unmarshall")
+		log.Println("error while bson Unmarshall")
 		return err
 	}
-	fmt.Println(bdoc)
+	log.Println(bdoc)
 	insertResult, err := ms.Database.Collection(collection).InsertOne(ctx, bdoc)
 	if err != nil {
-		fmt.Println("error while insert")
+		log.Println("error while insert")
 		return err
 	}
 	log.Println("Inserted a single document: ", insertResult.InsertedID)
@@ -77,12 +77,14 @@ func NewMongoSession(ctx context.Context, URI string, DB string) (*MongoSession,
 	ms.Client = client
 
 	if err != nil {
-		log.Fatal("cannot make connection to DB", err)
+		log.Print("cannot make connection to DB", err)
+		return nil, err
 	}
 	err = ms.Client.Ping(context, nil)
 
 	if err != nil {
-		log.Fatalln("cannot connect to DB, timed out ping", err)
+		log.Println("cannot connect to DB, timed out ping", err)
+		return nil, err
 	}
 	ms.Database = ms.Client.Database(DB)
 

@@ -17,6 +17,22 @@ type MongoSession struct {
 	Database *mongo.Database
 }
 
+func (ms *MongoSession) watchCollection(ctx context.Context, collection string, sendChan chan []byte) {
+	matchStage := bson.D{{"$match", bson.D{{"operationType", "insert"}}}}
+	col := ms.Database.Collection(collection, nil)
+	changeStream, err := col.Watch(ctx, mongo.Pipeline{matchStage}, nil)
+	if err != nil {
+		log.Println("Could not create changeStream: ", err)
+		return
+	}
+
+	// print out all change stream events in the order they're received
+	// see the mongo.ChangeStream documentation for more examples of using change streams
+	for changeStream.Next(ctx) {
+		sendChan <- changeStream.Current
+	}
+}
+
 // InsertOneWSWatch Inserts a single document to the given collection and to cig-news(WSWatch) as well
 func (ms *MongoSession) InsertOneWSWatch(ctx context.Context, col string, payload interface{}) (err error) {
 	id, err := ms.Database.Collection("cig-news").InsertOne(ctx, payload)
@@ -67,27 +83,23 @@ func (ms *MongoSession) InsertOne(ctx context.Context, payload string, collectio
 
 // NewMongoSession connects to a DB and returns the client
 func NewMongoSession(ctx context.Context, URI string, DB string) (*MongoSession, error) {
-	var ms MongoSession
 	context, ctxCancel := context.WithTimeout(ctx, 10*time.Second)
 	defer ctxCancel()
 	var dbOpts options.ClientOptions
 	dbOpts.ApplyURI(URI)
 	client, err := mongo.Connect(context, &dbOpts)
 
-	ms.Client = client
-
 	if err != nil {
 		log.Print("cannot make connection to DB", err)
 		return nil, err
 	}
-	err = ms.Client.Ping(context, nil)
+	err = client.Ping(context, nil)
 
 	if err != nil {
 		log.Println("cannot connect to DB, timed out ping", err)
 		return nil, err
 	}
-	ms.Database = ms.Client.Database(DB)
 
 	fmt.Println("Connected to MongoDB!")
-	return &ms, nil
+	return &MongoSession{Client: client, Database: client.Database(DB)}, nil
 }

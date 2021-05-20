@@ -17,7 +17,7 @@ type MongoSession struct {
 	Database *mongo.Database
 }
 
-func (ms *MongoSession) watchCollection(ctx context.Context, collection string, sendChan chan []byte) {
+func (ms *MongoSession) WatchCollection(ctx context.Context, collection string, sendChan chan []byte) {
 	matchStage := bson.D{{"$match", bson.D{{"operationType", "insert"}}}}
 	col := ms.Database.Collection(collection, nil)
 	changeStream, err := col.Watch(ctx, mongo.Pipeline{matchStage}, nil)
